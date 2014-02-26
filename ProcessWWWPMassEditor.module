@@ -1,0 +1,170 @@
+<?php
+
+class ProcessWWWPMassEditor extends Process {
+
+    public static function getModuleInfo() {
+        return array(
+            'title' => 'We Work We Play Mass Editor',
+            'summary' => 'Edit a lot of child pages at once.',
+            'version' => 1,
+            'author' => 'Pieter Beulque',
+            'href' => 'http://weworkweplay.com/',
+            'permission' => 'page-edit',
+            'installs' => array('MarkupAdminEditableTable')
+        );
+    }
+
+    const pageName = 'wwwp-mass-edit';
+
+    public function ___execute() {
+        $form = $this->modules->get('InputfieldForm');
+        $form->attr('id+name', 'selector-form');
+        $form->attr('action', 'show/');
+        $form->attr('method', 'get');
+
+        $f = $this->modules->get('InputfieldText');
+        $f->attr('name', 'selector');
+        $f->label = 'Selector';
+        $f->description = 'Example: template=basic-page';
+        $form->append($f);
+
+        $button = $this->modules->get('InputfieldSubmit');
+        $button->value = 'Find pages';
+        $form->append($button);
+
+        return '<br /><br />' . $form->render();
+    }
+
+    public function ___executeEdit() {
+        foreach ($_POST['pages'] as $id => $values) {
+            $page = wire('pages')->get((int) $id);
+
+            if (!!$page->id) {
+                foreach ($values as $k => $v) {
+                    $page->set($k, $v);
+                }
+
+                $page->save();
+            }
+        }
+
+        header('Location: ../show/?selector=' . urlencode(wire('input')->post->selector) . '&success');
+
+        die;
+    }
+
+    public function ___executeShow() {
+        $selector = urldecode(wire('input')->get->selector);
+
+        if (isset(wire('input')->get->success)) {
+            $this->message('Updated all pages');
+        }
+
+        $out = '<form method="post" action="../edit/">';
+
+        $out .= '<input type="hidden" name="selector" value="' . $selector . '" />';
+
+        $parents = array();
+        $editableFields = array();
+
+        foreach (wire('pages')->find($selector) as $page) {
+            $parents[$page->parent->id] = $page->parent;
+
+            if (count($editableFields) === 0) {
+                foreach ($page->template->fields as $field) {
+                    if (
+                        // Allowed field types
+                        (
+                            $field->type instanceof FieldtypePageTitle
+                            || $field->type instanceof FieldtypeText
+                        )
+                        // Blocked field types
+                        && !(
+                            $field->type instanceof FieldtypeTextarea
+                            || $field->name === 'headline'
+                        )
+                    ) {
+                        $editableFields[$field->name] = $field->label;
+                    }
+                }
+            }
+        }
+
+        foreach ($parents as $parent) {
+            $tree = array();
+            $temp = $parent;
+            while (!!$temp->id) {
+                $tree[] = $temp;
+                $temp = $temp->parent;
+            }
+
+            $tree = array_reverse($tree);
+
+            $out .= '<fieldset><h2>';
+
+            foreach ($tree as $p) {
+                $out .= '<a href="' . wire('config')->urls->admin . 'page/edit/?id=' . $p->id . '">' . $p->title . '</a>' . ' - ';
+            }
+
+            $out = rtrim($out, ' - ');
+
+            $out .= '</li></h2>';
+
+            $table = wire('modules')->get("MarkupAdminEditableTable");
+            $table->headerRow($editableFields);
+
+            $pages = $parent->find($selector);
+
+            foreach ($pages as $page) {
+                $row = array(
+                    $page->title => wire('config')->urls->admin . 'page/edit/?id=' . $page->id
+                );
+
+                foreach ($editableFields as $k => $f) {
+                    if ($k === 'title') continue;
+                    if ($k === 'headline') continue;
+
+                    $row[] = array('input' => array('name' => 'pages[' . $page->id . '][' . $k . ']', 'value' => $page->get($k)));
+                }
+
+                $table->row($row);
+            }
+
+            $out .=  $table->render();
+
+            $out .= '</fieldset>';
+        }
+
+        $button = $this->modules->get('InputfieldSubmit');
+        $button->value = 'Update';
+
+        $out .= $button->render();
+
+        $out .= '</form>';
+
+        return $out;
+    }
+
+    public function ___install() {
+        $page = new Page();
+        $page->template = 'admin';
+        $page->name = self::pageName;
+        $page->parent = $this->pages->get($this->config->adminRootPageID)->child('name=setup');
+        $page->process = $this;
+        $page->title = 'WWWP Mass Editor';
+
+        $page->save();
+
+        $this->message('Created Page: ' . $page->path);
+    }
+
+    public function ___uninstall() {
+        $moduleID = $this->modules->getModuleID($this);
+        $page = $this->pages->get('template=admin,process=' . $moduleID . ',name=' . self::pageName);
+
+        if ($page->id) {
+            $this->message('Deleting Page: ' . $page->path);
+            $page->delete();
+        }
+    }
+}
