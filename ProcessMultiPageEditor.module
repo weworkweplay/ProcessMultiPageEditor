@@ -1,10 +1,10 @@
 <?php
 
-class ProcessWWWPMassEditor extends Process {
+class ProcessMultiPageEditor extends Process {
 
     public static function getModuleInfo() {
         return array(
-            'title' => 'We Work We Play Mass Editor',
+            'title' => 'MultiPage Editor',
             'summary' => 'Edit a lot of child pages at once.',
             'version' => 1,
             'author' => 'Pieter Beulque',
@@ -14,7 +14,7 @@ class ProcessWWWPMassEditor extends Process {
         );
     }
 
-    const pageName = 'wwwp-mass-edit';
+    const pageName = 'multipage-editor';
 
     public function ___execute() {
         $form = $this->modules->get('InputfieldForm');
@@ -151,7 +151,7 @@ class ProcessWWWPMassEditor extends Process {
         $page->name = self::pageName;
         $page->parent = $this->pages->get($this->config->adminRootPageID)->child('name=setup');
         $page->process = $this;
-        $page->title = 'WWWP Mass Editor';
+        $page->title = 'MultiPage Editor';
 
         $page->save();
 
