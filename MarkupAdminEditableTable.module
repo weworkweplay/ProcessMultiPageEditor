@@ -7,7 +7,7 @@ class MarkupAdminEditableTable extends MarkupAdminDataTable {
 			'title' => 'Admin Editable Table',
 			'summary' => 'Generates XHTML markup for data tables used by ProcessWire admin',
 			'version' => 101,
-			'permanent' => true,
+			'permanent' => false,
 			);
 	}
 
